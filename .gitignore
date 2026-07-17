@@ -4,6 +4,8 @@ dist/
 .output/
 .vinxi/
 .tanstack/
+.wrangler/
+wrangler.json
 .env
 .env.local
 .env.development.local
