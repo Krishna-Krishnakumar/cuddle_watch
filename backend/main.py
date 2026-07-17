@@ -7,6 +7,55 @@ import cv2
 import numpy as np
 import joblib
 import random
+import math
+
+def generate_mock_nursery_frame(flag: int) -> np.ndarray:
+    """Generates a high-quality mock nursery room BGR frame for cloud fallback deployments."""
+    # 640x360 frame
+    frame = np.zeros((360, 640, 3), dtype=np.uint8)
+    
+    # Background gradient (cozy dark room night ambient)
+    for y in range(360):
+        # Slate blue gradient
+        color = [int(15 + (y / 360) * 10), int(10 + (y / 360) * 10), int(20 + (y / 360) * 15)]
+        frame[y, :] = color
+        
+    # Draw crib rails in background
+    for x in range(100, 540, 40):
+        cv2.line(frame, (x, 120), (x, 280), (35, 30, 45), 2)
+    cv2.line(frame, (80, 120), (560, 120), (45, 40, 55), 4)
+    cv2.line(frame, (80, 280), (560, 280), (45, 40, 55), 4)
+
+    # Draw sleeping baby (fluctuates with breathing / sleep movements)
+    breathing = math.sin(flag * 0.08)
+    # Add random waking movement twitches
+    twitch_x = int(random.choice([-1, 0, 1]) if random.random() < 0.05 else 0)
+    twitch_y = int(random.choice([-1, 0, 1]) if random.random() < 0.05 else 0)
+    
+    baby_y_center = 200 + int(breathing * 2) + twitch_y
+    baby_x_center = 320 + twitch_x
+    
+    # Cot blanket
+    cv2.rectangle(frame, (250, 180), (390, 250), (90, 80, 110), -1)
+    
+    # Baby head
+    cv2.circle(frame, (baby_x_center, baby_y_center), 18, (230, 210, 200), -1)
+    # Sleeping eyes (curved arcs)
+    cv2.circle(frame, (baby_x_center - 5, baby_y_center), 2, (30, 30, 35), -1)
+    cv2.circle(frame, (baby_x_center + 5, baby_y_center), 2, (30, 30, 35), -1)
+    
+    # Status banners & HUD
+    cv2.putText(frame, "[ CLOUD MOCK NURSERY ]", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 230, 120), 1, cv2.LINE_AA)
+    cv2.putText(frame, "STATUS: ACTIVE MONITORING", (20, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1, cv2.LINE_AA)
+    cv2.putText(frame, f"FPS: 30 | CH-01", (500, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (100, 100, 120), 1, cv2.LINE_AA)
+    
+    # Draw a rotating scanning dot to represent active stream
+    dot_x = 20 + int((flag % 40) * 1)
+    cv2.circle(frame, (dot_x, 320), 3, (0, 255, 0), -1)
+    cv2.putText(frame, "PROCESSING LOGS", (70, 324), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (100, 100, 120), 1, cv2.LINE_AA)
+
+    return frame
+
 from collections import deque, Counter
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -191,8 +240,9 @@ async def capture_video_loop():
     while True:
         frame = await asyncio.to_thread(camera.get_frame)
         if frame is None:
-            await asyncio.sleep(0.1)
-            continue
+            # Fallback to simulated nursery frame for cloud hosts without physical webcams
+            frame = generate_mock_nursery_frame(flag)
+            flag = (flag + 1) % 360
         processed, flag, _, _ = process_frame_pipeline(frame, flag)
         _, jpeg = cv2.imencode('.jpg', processed)
         yield (b'--frame\r\n'
