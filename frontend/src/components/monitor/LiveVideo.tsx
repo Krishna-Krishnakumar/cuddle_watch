@@ -21,6 +21,8 @@ export function LiveVideo({
   simPreset = "sleeping",
   isMotionDetected = false,
   motionScore = 0,
+  onLocalMotionUpdate,
+  onWebcamToggle,
 }: Props) {
   const [filter, setFilter] = useState<VideoFilter>("normal");
   const [showHUD, setShowHUD] = useState(true);
