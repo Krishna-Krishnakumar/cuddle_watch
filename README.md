@@ -1,4 +1,4 @@
-# CUDDLE WWATCH - Smart Nursery Monitor
+# CUDDLE WATCH - Smart Nursery Monitor
 
 A state-of-the-art, real-time baby monitoring dashboard combining a high-performance **Python FastAPI backend** for computer vision and audio classification with a **React (Vite/TanStack Start) frontend** styled in premium glassmorphism.
 
@@ -30,15 +30,13 @@ Here is a preview of the smart baby monitor dashboard interface in action:
 └───────────────────────────────────────┴────────────────────────────────┘
 ```
 
-> **Add Your Screenshots Here:**
+
+>
+>
 > <img width="1458" height="837" alt="Screenshot 2026-07-17 at 11 44 37 PM" src="https://github.com/user-attachments/assets/ab954ff0-97ef-4560-933c-d20f51af1b4f" />
 
-> 
-> *Active Cry Distress Alert Overlay:*
-> ![Cry Alert Warning](docs/screenshots/cry_alert.png)
-> 
-> *Night Vision Camera View & HUD:*
-> ![Night Vision Mode](docs/screenshots/night_vision.png)
+> <img width="1458" height="837" alt="Screenshot 2026-07-17 at 11 46 27 PM" src="https://github.com/user-attachments/assets/c2034874-7577-4054-bbd1-eec5fead7158" />
+
 
 ---
 
