@@ -22,11 +22,46 @@ export function LiveVideo({
 }: Props) {
   const [filter, setFilter] = useState<VideoFilter>("normal");
   const [showHUD, setShowHUD] = useState(true);
+  const [useWebcam, setUseWebcam] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const animationFrameId = useRef<number | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
 
   const feedUrl = frameSrc ?? `${API_BASE}/api/video-feed`;
+
+  // Local WebCam handler
+  useEffect(() => {
+    if (!useWebcam || isSimulated) {
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((track) => track.stop());
+        localStreamRef.current = null;
+      }
+      return;
+    }
+
+    navigator.mediaDevices
+      .getUserMedia({ video: { width: 1280, height: 720 } })
+      .then((stream) => {
+        localStreamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      })
+      .catch((err) => {
+        console.error("Webcam access failed:", err);
+        alert("Failed to access local device camera. Please check your browser camera permissions.");
+        setUseWebcam(false);
+      });
+
+    return () => {
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((track) => track.stop());
+        localStreamRef.current = null;
+      }
+    };
+  }, [useWebcam, isSimulated]);
 
   // Procedural Canvas Animation for Simulated Nursery Video Feed
   useEffect(() => {
@@ -214,19 +249,29 @@ export function LiveVideo({
     <Card className="relative overflow-hidden border-border bg-slate-950 p-0 shadow-2xl">
       <div className={`relative aspect-video w-full overflow-hidden bg-slate-950 ${filter === "night" ? "scanline" : ""}`}>
         
-        {/* Render real stream only when not simulated */}
-        {!isSimulated ? (
-          <img
-            src={feedUrl}
-            alt="Live nursery feed"
-            className={`h-full w-full object-cover transition-all duration-300 ${getFilterClass()}`}
-          />
-        ) : (
+        {/* Render options: Simulator | Local WebCam | Backend MJPEG Feed */}
+        {isSimulated ? (
           /* Procedural Interactive Simulator Screen (No Unsplash load) */
           <canvas
             ref={canvasRef}
             width={640}
             height={360}
+            className={`h-full w-full object-cover transition-all duration-300 ${getFilterClass()}`}
+          />
+        ) : useWebcam ? (
+          /* HTML5 MediaDevices client-side camera capture */
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className={`h-full w-full object-cover transition-all duration-300 ${getFilterClass()}`}
+          />
+        ) : (
+          /* Python FastAPI backend stream */
+          <img
+            src={feedUrl}
+            alt="Live nursery feed"
             className={`h-full w-full object-cover transition-all duration-300 ${getFilterClass()}`}
           />
         )}
@@ -287,6 +332,20 @@ export function LiveVideo({
           >
             {showHUD ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
+
+          {!isSimulated && (
+            <button
+              onClick={() => setUseWebcam(!useWebcam)}
+              title={useWebcam ? "Use Server Feed" : "Use Browser Device Camera"}
+              className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-all shadow ${
+                useWebcam
+                  ? "bg-emerald-500 border-emerald-400 text-slate-900 hover:bg-emerald-400 glow-success"
+                  : "bg-black/75 border-white/10 text-white/80 hover:bg-black hover:text-white"
+              }`}
+            >
+              <Video className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
         {/* Filter controls at bottom right */}
