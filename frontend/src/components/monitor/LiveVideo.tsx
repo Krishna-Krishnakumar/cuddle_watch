@@ -33,12 +33,22 @@ export function LiveVideo({
 
   const feedUrl = frameSrc ?? `${API_BASE}/api/video-feed`;
 
+  // Use refs to store parent callback references so that their reference identity shifts
+  // do not trigger useEffect dependency restarts (which leads to recursive getUserMedia crashes)
+  const onLocalMotionUpdateRef = useRef(onLocalMotionUpdate);
+  const onWebcamToggleRef = useRef(onWebcamToggle);
+
+  useEffect(() => {
+    onLocalMotionUpdateRef.current = onLocalMotionUpdate;
+    onWebcamToggleRef.current = onWebcamToggle;
+  });
+
   // Notify parent of webcam state changes
   useEffect(() => {
-    if (onWebcamToggle) {
-      onWebcamToggle(useWebcam && !isSimulated);
+    if (onWebcamToggleRef.current) {
+      onWebcamToggleRef.current(useWebcam && !isSimulated);
     }
-  }, [useWebcam, isSimulated, onWebcamToggle]);
+  }, [useWebcam, isSimulated]);
 
   // Local WebCam handler & pixel-diff motion analysis loop
   useEffect(() => {
@@ -91,8 +101,8 @@ export function LiveVideo({
               // Scale score to match backend bounds (0 to 5000+)
               // An 80x45 canvas has 3600 pixels.
               const score = Math.round((diffPixels / 3600) * 12000);
-              if (onLocalMotionUpdate) {
-                onLocalMotionUpdate(score);
+              if (onLocalMotionUpdateRef.current) {
+                onLocalMotionUpdateRef.current(score);
               }
             }
             prevData = data;
@@ -128,7 +138,7 @@ export function LiveVideo({
         localStreamRef.current = null;
       }
     };
-  }, [useWebcam, isSimulated, onLocalMotionUpdate]);
+  }, [useWebcam, isSimulated]);
 
   // Procedural Canvas Animation for Simulated Nursery Video Feed
   useEffect(() => {
