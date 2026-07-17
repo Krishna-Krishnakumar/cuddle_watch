@@ -1,0 +1,42 @@
+# Node / Vite dependencies and builds
+node_modules/
+dist/
+.output/
+.vinxi/
+.tanstack/
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Python environment and caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.ipynb_checkpoints
+
+# Machine Learning / joblib caches
+.pytest_cache/
+.mypy_cache/
+
+# OS-specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Project-specific temp assets (avoids committing local camera calibrators)
+backend/VIDEO_ANALYSIS/template.jpg
+backend/app_utils/recording.wav
+backend/test_output.jpg
