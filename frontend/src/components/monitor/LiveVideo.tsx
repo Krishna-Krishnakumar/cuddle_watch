@@ -9,6 +9,8 @@ interface Props {
   simPreset?: "sleeping" | "moving" | "crying";
   isMotionDetected?: boolean;
   motionScore?: number;
+  onLocalMotionUpdate?: (score: number) => void;
+  onWebcamToggle?: (active: boolean) => void;
 }
 
 type VideoFilter = "normal" | "night" | "blueprint";
@@ -31,7 +33,14 @@ export function LiveVideo({
 
   const feedUrl = frameSrc ?? `${API_BASE}/api/video-feed`;
 
-  // Local WebCam handler
+  // Notify parent of webcam state changes
+  useEffect(() => {
+    if (onWebcamToggle) {
+      onWebcamToggle(useWebcam && !isSimulated);
+    }
+  }, [useWebcam, isSimulated, onWebcamToggle]);
+
+  // Local WebCam handler & pixel-diff motion analysis loop
   useEffect(() => {
     if (!useWebcam || isSimulated) {
       if (localStreamRef.current) {
@@ -41,6 +50,60 @@ export function LiveVideo({
       return;
     }
 
+    // Create a tiny offscreen canvas for super-fast, low-overhead pixel analysis
+    const analysisCanvas = document.createElement("canvas");
+    analysisCanvas.width = 80;
+    analysisCanvas.height = 45;
+    const analysisCtx = analysisCanvas.getContext("2d");
+
+    let active = true;
+    let frameId: number;
+    let lastTime = Date.now();
+    let prevData: Uint8ClampedArray | null = null;
+
+    const analyzeFrame = () => {
+      if (!active) return;
+
+      const now = Date.now();
+      // Cap analysis rate to ~15 FPS to conserve user CPU cycles
+      if (now - lastTime > 66) {
+        lastTime = now;
+        if (videoRef.current && analysisCtx) {
+          try {
+            analysisCtx.drawImage(videoRef.current, 0, 0, 80, 45);
+            const imgData = analysisCtx.getImageData(0, 0, 80, 45);
+            const data = imgData.data;
+
+            if (prevData) {
+              let diffPixels = 0;
+              for (let i = 0; i < data.length; i += 4) {
+                const rDiff = Math.abs(data[i] - prevData[i]);
+                const gDiff = Math.abs(data[i + 1] - prevData[i + 1]);
+                const bDiff = Math.abs(data[i + 2] - prevData[i + 2]);
+                const brightnessDiff = (rDiff + gDiff + bDiff) / 3;
+
+                // Threshold difference (30 / 255 represents noticeable pixel color change)
+                if (brightnessDiff > 30) {
+                  diffPixels++;
+                }
+              }
+
+              // Scale score to match backend bounds (0 to 5000+)
+              // An 80x45 canvas has 3600 pixels.
+              const score = Math.round((diffPixels / 3600) * 12000);
+              if (onLocalMotionUpdate) {
+                onLocalMotionUpdate(score);
+              }
+            }
+            prevData = data;
+          } catch (e) {
+            // Suppress errors during stream setup
+          }
+        }
+      }
+      frameId = requestAnimationFrame(analyzeFrame);
+    };
+
     navigator.mediaDevices
       .getUserMedia({ video: { width: 1280, height: 720 } })
       .then((stream) => {
@@ -48,6 +111,8 @@ export function LiveVideo({
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
+        // Start pixel difference capture loop
+        frameId = requestAnimationFrame(analyzeFrame);
       })
       .catch((err) => {
         console.error("Webcam access failed:", err);
@@ -56,12 +121,14 @@ export function LiveVideo({
       });
 
     return () => {
+      active = false;
+      cancelAnimationFrame(frameId);
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((track) => track.stop());
         localStreamRef.current = null;
       }
     };
-  }, [useWebcam, isSimulated]);
+  }, [useWebcam, isSimulated, onLocalMotionUpdate]);
 
   // Procedural Canvas Animation for Simulated Nursery Video Feed
   useEffect(() => {

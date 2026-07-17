@@ -48,6 +48,13 @@ function Index() {
   const [audioStatus, setAudioStatus] = useState<Status>("ok");
   const [flag, setFlag] = useState<0 | 1>(0);
   const [connected, setConnected] = useState(false);
+  const [isWebcamActive, setIsWebcamActive] = useState(false);
+  const isWebcamActiveRef = useRef(false);
+
+  useEffect(() => {
+    isWebcamActiveRef.current = isWebcamActive;
+  }, [isWebcamActive]);
+
   const [logs, setLogs] = useState<LogEntry[]>(() => seedLogs());
 
   // Quick stats variables
@@ -97,6 +104,25 @@ function Index() {
     }
   };
 
+  const handleLocalMotionUpdate = (score: number) => {
+    // Process and append local webcam motion data point
+    setMotionData((prev) => {
+      const nextTime = (prev[prev.length - 1]?.t ?? 0) + 1;
+      const nextArr = [...prev, { t: nextTime, v: score }];
+      return nextArr.length > 60 ? nextArr.slice(nextArr.length - 60) : nextArr;
+    });
+
+    // Simulate organic fluctuations in vitals based on real local webcam movement
+    const isMoving = score > 1500;
+    setTemperature((t) => Math.min(24, Math.max(20, t + (Math.random() - 0.5) * 0.03)));
+    setHumidity((h) => Math.min(60, Math.max(40, h + Math.floor((Math.random() - 0.5) * 2))));
+    setHeartRate((hr) => {
+      const base = isMoving ? 115 : 82;
+      return Math.floor(base + Math.sin(Date.now() / 4000) * 4 + Math.random() * 3);
+    });
+    setSleepStage(isMoving ? "Awake" : "Light");
+  };
+
   // Dynamic graph bounds linked to the sensitivity buffer
   const baselineHigh = useMemo(() => settings.motion_buffer * 60, [settings.motion_buffer]);
   const baselineLow = useMemo(() => Math.round(baselineHigh / 2), [baselineHigh]);
@@ -120,6 +146,7 @@ function Index() {
       };
 
       ws.onmessage = (event) => {
+        if (isWebcamActiveRef.current) return;
         try {
           const payload = JSON.parse(event.data);
           
@@ -336,6 +363,8 @@ function Index() {
               simPreset={simPreset}
               isMotionDetected={motionData[motionData.length - 1]?.v > baselineHigh}
               motionScore={motionData[motionData.length - 1]?.v ?? 0}
+              onLocalMotionUpdate={handleLocalMotionUpdate}
+              onWebcamToggle={setIsWebcamActive}
             />
 
             {/* The motion telemetry chart */}
