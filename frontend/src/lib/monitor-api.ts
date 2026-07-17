@@ -13,12 +13,16 @@
  *     { type: "metrics", motion_thresh: number, audio_status: "ok"|"not ok", flag: 0|1, ts: number }
  */
 
+const envApiUrl = import.meta.env?.VITE_API_URL;
+
 export const API_BASE =
+  envApiUrl ||
   (typeof window !== "undefined" && (window as any).__MONITOR_API__) ||
   "http://localhost:8000";
+
 export const WS_URL =
   (typeof window !== "undefined" && (window as any).__MONITOR_WS__) ||
-  "ws://localhost:8000/ws/telemetry";
+  API_BASE.replace(/^http/, "ws") + "/ws/telemetry";
 
 export type AudioStatus = "ok" | "not ok";
 

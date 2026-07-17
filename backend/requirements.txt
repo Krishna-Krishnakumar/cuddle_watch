@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+websockets
+numpy
+scikit-learn
+joblib
+librosa
+soundfile
+sounddevice
+opencv-python-headless
