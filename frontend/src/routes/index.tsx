@@ -42,7 +42,14 @@ export const Route = createFileRoute("/")({
 
 type SimMode = "sleeping" | "moving" | "crying";
 
+interface NurseryAlert {
+  type: "motion" | "cry";
+  message: string;
+  time: string;
+}
+
 function Index() {
+  const [activeAlert, setActiveAlert] = useState<NurseryAlert | null>(null);
   // Telemetry state
   const [motionData, setMotionData] = useState<MotionPoint[]>(() => seedMotion());
   const [audioStatus, setAudioStatus] = useState<Status>("ok");
@@ -112,6 +119,15 @@ function Index() {
       return nextArr.length > 60 ? nextArr.slice(nextArr.length - 60) : nextArr;
     });
 
+    // Trigger local webcam motion alert modal
+    if (score > baselineHigh) {
+      setActiveAlert((curr) => curr || {
+        type: "motion",
+        message: `Movement observed in the baby cot (Intensity: ${score})`,
+        time: new Date().toLocaleTimeString(),
+      });
+    }
+
     // Simulate organic fluctuations in vitals based on real local webcam movement
     const isMoving = score > 1500;
     setTemperature((t) => Math.min(24, Math.max(20, t + (Math.random() - 0.5) * 0.03)));
@@ -151,20 +167,37 @@ function Index() {
           const payload = JSON.parse(event.data);
           
           // Process and append motion data point
+          const nextValue = payload.motion_thresh ?? 0;
           setMotionData((prev) => {
             const nextTime = (prev[prev.length - 1]?.t ?? 0) + 1;
-            const nextValue = payload.motion_thresh ?? 0;
             const nextArr = [...prev, { t: nextTime, v: nextValue }];
             return nextArr.length > 60 ? nextArr.slice(nextArr.length - 60) : nextArr;
           });
+
+          // Trigger alert modals on threshold bounds
+          if (nextValue > baselineHigh) {
+            setActiveAlert((curr) => curr || {
+              type: "motion",
+              message: `Movement observed in the baby cot (Intensity: ${nextValue})`,
+              time: new Date().toLocaleTimeString(),
+            });
+          }
 
           // Synchronize current Audio status
           const incomingAudio: Status = payload.audio_status;
           setAudioStatus(incomingAudio);
           setFlag(incomingAudio === "not ok" ? 1 : 0);
 
+          if (incomingAudio === "not ok") {
+            setActiveAlert((curr) => curr || {
+              type: "cry",
+              message: "Cry distress patterns detected by sound analyzer.",
+              time: new Date().toLocaleTimeString(),
+            });
+          }
+
           // Simulate organic fluctuations in vitals based on real incoming telemetry
-          const isMoving = (payload.motion_thresh ?? 0) > 1000;
+          const isMoving = nextValue > 1000;
           setTemperature((t) => Math.min(24, Math.max(20, t + (Math.random() - 0.5) * 0.05)));
           setHumidity((h) => Math.min(60, Math.max(40, h + Math.floor((Math.random() - 0.5) * 2))));
           setHeartRate((hr) => {
@@ -243,6 +276,23 @@ function Index() {
       // Synchronize audio classify states
       setAudioStatus(mockAudio);
       setFlag(mockAudio === "not ok" ? 1 : 0);
+
+      // Trigger simulator alert modals on threshold bounds
+      if (mockMotion > baselineHigh) {
+        setActiveAlert((curr) => curr || {
+          type: "motion",
+          message: `[SIMULATOR] Movement observed in the baby cot (Intensity: ${mockMotion})`,
+          time: new Date().toLocaleTimeString(),
+        });
+      }
+
+      if (mockAudio === "not ok") {
+        setActiveAlert((curr) => curr || {
+          type: "cry",
+          message: "[SIMULATOR] Baby cry distress patterns detected in the nursery.",
+          time: new Date().toLocaleTimeString(),
+        });
+      }
 
       // Adjust vitals stats
       setHeartRate(targetHeartRate);
@@ -464,6 +514,56 @@ function Index() {
           WebSocket <code className="text-accent bg-slate-900 px-1 py-0.5 rounded">{WS_URL}</code>
         </footer>
       </main>
+
+      {/* Dynamic Critical Alert Overlay Modal */}
+      {activeAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className={`relative w-full max-w-md overflow-hidden rounded-2xl border p-6 shadow-2xl backdrop-blur-xl animate-scale-in transition-all duration-300 ${
+            activeAlert.type === "cry"
+              ? "bg-rose-950/80 border-rose-500/30 text-rose-100 shadow-rose-500/10"
+              : "bg-amber-950/80 border-amber-500/30 text-amber-100 shadow-amber-500/10"
+          }`}>
+            {/* Top red/amber warning strip */}
+            <div className={`absolute top-0 left-0 right-0 h-1.5 ${
+              activeAlert.type === "cry" ? "bg-rose-500" : "bg-amber-500"
+            }`} />
+            
+            <div className="flex items-start gap-4 mt-2">
+              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/10 ${
+                activeAlert.type === "cry" ? "text-rose-400" : "text-amber-400"
+              }`}>
+                <AlertTriangle className="h-6 w-6 animate-bounce" />
+              </div>
+              
+              <div className="space-y-1 flex-1">
+                <h3 className="text-lg font-black tracking-tight uppercase">
+                  {activeAlert.type === "cry" ? "👶 Cry Alert Triggered" : "⚠️ Motion Alert Triggered"}
+                </h3>
+                <p className="text-[11px] opacity-60 font-mono">Timestamp: {activeAlert.time}</p>
+                <p className="text-sm opacity-90 leading-relaxed pt-2">
+                  {activeAlert.message}
+                </p>
+              </div>
+            </div>
+            
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setActiveAlert(null);
+                  toast.success("Alert acknowledged.");
+                }}
+                className={`w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 border ${
+                  activeAlert.type === "cry"
+                    ? "bg-rose-500 hover:bg-rose-600 text-white border-rose-400/20 active:scale-95 cursor-pointer"
+                    : "bg-amber-500 hover:bg-amber-600 text-slate-950 border-amber-400/20 active:scale-95 cursor-pointer"
+                }`}
+              >
+                Acknowledge Alert
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
