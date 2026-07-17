@@ -23,7 +23,7 @@ import { ControlsPanel } from "@/components/monitor/ControlsPanel";
 import { ActivityLog, type LogEntry } from "@/components/monitor/ActivityLog";
 import { QuickStats } from "@/components/monitor/QuickStats";
 import type { AudioStatus as Status, SettingsPayload, StatusPayload } from "@/lib/monitor-api";
-import { WS_URL } from "@/lib/monitor-api";
+import { WS_URL, API_BASE } from "@/lib/monitor-api";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
@@ -73,7 +73,7 @@ function Index() {
   // Load initial settings on mount
   useEffect(() => {
     if (isSimulated) return;
-    fetch("http://localhost:8000/api/settings")
+    fetch(`${API_BASE}/api/settings`)
       .then((res) => {
         if (res.ok) return res.json();
         throw new Error();
@@ -87,7 +87,7 @@ function Index() {
     setSettings(newSettings);
     if (isSimulated) return;
     try {
-      await fetch("http://localhost:8000/api/settings", {
+      await fetch(`${API_BASE}/api/settings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newSettings),
@@ -331,7 +331,7 @@ function Index() {
           <div className="space-y-6 lg:col-span-2">
             {/* The live video stream frame */}
             <LiveVideo
-              frameSrc="http://localhost:8000/api/video-feed"
+              frameSrc={`${API_BASE}/api/video-feed`}
               isSimulated={isSimulated}
               simPreset={simPreset}
               isMotionDetected={motionData[motionData.length - 1]?.v > baselineHigh}
